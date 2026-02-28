@@ -7,7 +7,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "db:init": "npx supabase init",
+    "db:start": "node scripts/check-docker.js && npx --yes supabase start",
+    "db:stop": "node scripts/check-docker.js && npx --yes supabase stop",
+    "db:status": "node scripts/check-docker.js && npx --yes supabase status",
+    "db:reset": "node scripts/check-docker.js && npx --yes supabase db reset",
+    "db:link": "npx --yes supabase link",
+    "db:push": "npx --yes supabase db push",
+    "db:pull": "npx --yes supabase db pull"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
