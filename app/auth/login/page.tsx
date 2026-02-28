@@ -14,6 +14,10 @@ import { createClient } from "@/lib/supabase/client"
 
 const DEFAULT_REDIRECT = "/"
 
+function normalizePhoneNumber(value: string) {
+  return value.replace(/\s+/g, "")
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<LoginPageSkeleton />}>
@@ -30,11 +34,13 @@ function LoginPageContent() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [guestPhoneNumber, setGuestPhoneNumber] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [phoneOtp, setPhoneOtp] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isGuestSigningIn, setIsGuestSigningIn] = useState(false)
   const [isResettingPassword, setIsResettingPassword] = useState(false)
   const [isSendingPhoneOtp, setIsSendingPhoneOtp] = useState(false)
   const [isVerifyingPhoneOtp, setIsVerifyingPhoneOtp] = useState(false)
@@ -105,11 +111,46 @@ function LoginPageContent() {
     setIsResettingPassword(false)
   }
 
+  const handleGuestLogin = async () => {
+    setError(null)
+    setMessage(null)
+
+    const normalizedPhone = normalizePhoneNumber(guestPhoneNumber.trim())
+
+    if (!normalizedPhone) {
+      setError("Please enter your phone number to continue as guest.")
+      return
+    }
+
+    setIsGuestSigningIn(true)
+
+    const { error: guestError } = await supabase.auth.signInAnonymously({
+      options: {
+        data: {
+          is_guest: true,
+          phone: normalizedPhone,
+          full_name: `Guest ${normalizedPhone.slice(-4) || "User"}`,
+        },
+      },
+    })
+
+    if (guestError) {
+      setError(guestError.message)
+      setIsGuestSigningIn(false)
+      return
+    }
+
+    router.replace(redirectTo)
+    router.refresh()
+  }
+
   const handleSendPhoneOtp = async () => {
     setError(null)
     setMessage(null)
 
-    if (!phoneNumber.trim()) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber.trim())
+
+    if (!normalizedPhone) {
       setError("Please enter your phone number to receive OTP.")
       return
     }
@@ -117,7 +158,7 @@ function LoginPageContent() {
     setIsSendingPhoneOtp(true)
 
     const { error: otpError } = await supabase.auth.signInWithOtp({
-      phone: phoneNumber.trim(),
+      phone: normalizedPhone,
       options: {
         shouldCreateUser: false,
       },
@@ -137,7 +178,9 @@ function LoginPageContent() {
     setError(null)
     setMessage(null)
 
-    if (!phoneNumber.trim() || !phoneOtp.trim()) {
+    const normalizedPhone = normalizePhoneNumber(phoneNumber.trim())
+
+    if (!normalizedPhone || !phoneOtp.trim()) {
       setError("Please enter both phone number and OTP.")
       return
     }
@@ -145,7 +188,7 @@ function LoginPageContent() {
     setIsVerifyingPhoneOtp(true)
 
     const { error: verifyError } = await supabase.auth.verifyOtp({
-      phone: phoneNumber.trim(),
+      phone: normalizedPhone,
       token: phoneOtp.trim(),
       type: "sms",
     })
@@ -175,6 +218,56 @@ function LoginPageContent() {
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Guest login</p>
+                  <p className="text-xs text-muted-foreground">
+                    Continue instantly by entering only your phone number.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="guestPhoneNumber">Phone number</Label>
+                  <Input
+                    id="guestPhoneNumber"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="+91 9876543210"
+                    value={guestPhoneNumber}
+                    onChange={(event) => setGuestPhoneNumber(event.target.value)}
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full gap-2"
+                  onClick={handleGuestLogin}
+                  disabled={isGuestSigningIn}
+                >
+                  {isGuestSigningIn ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Signing in as guest...
+                    </>
+                  ) : (
+                    <>
+                      <Smartphone className="h-4 w-4" />
+                      Continue as guest
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Or sign in with email</span>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
